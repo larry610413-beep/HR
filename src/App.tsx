@@ -16,17 +16,30 @@ import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'motion/react';
 import { Participant, Group } from './types';
 
+const initialNames = [
+  '陳冠廷', '林家宇', '黃建宏', '張雅婷', '李怡君',
+  '王志明', '吳佳穎', '劉淑芬', '蔡宗翰', '楊宗憲',
+  '許文龍', '鄭凱文', '洪詩婷', '邱柏翰', '曾彥廷',
+  '廖家豪', '賴冠宇', '徐浩恩', '莊子軒', '郭盈秀'
+];
+const defaultParticipants: Participant[] = initialNames.map((name, i) => ({
+  id: `default-${i}`,
+  name
+}));
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'list' | 'draw' | 'group'>('list');
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>(defaultParticipants);
   const [inputText, setInputText] = useState('');
   
   // Lucky Draw States
   const [isDrawing, setIsDrawing] = useState(false);
+  const [drawMode, setDrawMode] = useState<'individual' | 'group'>('individual');
   const [winner, setWinner] = useState<Participant | null>(null);
   const [allowRepeat, setAllowRepeat] = useState(false);
   const [drawHistory, setDrawHistory] = useState<Participant[]>([]);
   const [displayNames, setDisplayNames] = useState<string[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number>(1);
   
   // Grouping States
   const [groupSize, setGroupSize] = useState<number>(3);
@@ -79,45 +92,92 @@ export default function App() {
 
   // Lucky Draw Logic
   const startDraw = () => {
-    if (participants.length === 0) return;
-    
-    let pool = [...participants];
-    if (!allowRepeat) {
-      pool = pool.filter(p => !drawHistory.find(h => h.id === p.id));
-    }
-
-    if (pool.length === 0) {
-      alert('所有人都已中獎！');
-      return;
-    }
-
-    setIsDrawing(true);
-    setWinner(null);
-
-    // Animation logic
-    let counter = 0;
-    const duration = 3000; // 3 seconds
-    const interval = 100;
-    const totalSteps = duration / interval;
-
-    const timer = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * pool.length);
-      setDisplayNames([pool[randomIndex].name]);
-      counter++;
-
-      if (counter >= totalSteps) {
-        clearInterval(timer);
-        const finalWinner = pool[Math.floor(Math.random() * pool.length)];
-        setWinner(finalWinner);
-        setIsDrawing(false);
-        setDrawHistory(prev => [...prev, finalWinner]);
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
+    if (drawMode === 'individual') {
+      if (participants.length === 0) return;
+      
+      let pool = [...participants];
+      if (!allowRepeat) {
+        pool = pool.filter(p => !drawHistory.find(h => h.id === p.id));
       }
-    }, interval);
+
+      if (pool.length === 0) {
+        alert('所有人都已中獎！');
+        return;
+      }
+
+      setIsDrawing(true);
+      setWinner(null);
+
+      // Animation logic
+      let counter = 0;
+      const duration = 3000; // 3 seconds
+      const interval = 100;
+      const totalSteps = duration / interval;
+
+      const timer = setInterval(() => {
+        const randomIndex = Math.floor(Math.random() * pool.length);
+        setDisplayNames([pool[randomIndex].name]);
+        counter++;
+
+        if (counter >= totalSteps) {
+          clearInterval(timer);
+          const finalWinner = pool[Math.floor(Math.random() * pool.length)];
+          setWinner(finalWinner);
+          setIsDrawing(false);
+          setDrawHistory(prev => [...prev, finalWinner]);
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+      }, interval);
+    } else {
+      if (groups.length === 0) {
+        alert('請先進行分組！');
+        return;
+      }
+      
+      const targetGroup = groups.find(g => g.id === selectedGroupId) || groups[0];
+      
+      let pool = [...targetGroup.members];
+      if (!allowRepeat) {
+        pool = pool.filter(p => !drawHistory.find(h => h.id === p.id));
+      }
+
+      if (pool.length === 0) {
+        alert(`第 ${targetGroup.id} 組的所有人都已中獎！`);
+        return;
+      }
+
+      setIsDrawing(true);
+      setWinner(null);
+
+      let counter = 0;
+      const duration = 3000;
+      const interval = 100;
+      const totalSteps = duration / interval;
+
+      const timer = setInterval(() => {
+        const randomIndex = Math.floor(Math.random() * pool.length);
+        setDisplayNames([pool[randomIndex].name]);
+        counter++;
+
+        if (counter >= totalSteps) {
+          clearInterval(timer);
+          const finalWinner = pool[Math.floor(Math.random() * pool.length)];
+          const winnerRecord = { ...finalWinner, name: `[第${targetGroup.id}組] ${finalWinner.name}` };
+          setWinner(finalWinner);
+          setIsDrawing(false);
+          setDrawHistory(prev => [...prev, winnerRecord]);
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+      }, interval);
+    }
   };
 
   // Grouping Logic
@@ -247,8 +307,17 @@ export default function App() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {participants.map((p, idx) => (
                         <div key={p.id} className="bg-gray-50 border border-gray-100 px-3 py-2 rounded-lg text-sm flex items-center justify-between group">
-                          <span className="truncate">{p.name}</span>
-                          <span className="text-[10px] text-gray-300 font-mono">#{idx + 1}</span>
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <span className="text-[10px] text-gray-300 font-mono w-4">#{idx + 1}</span>
+                            <span className="truncate">{p.name}</span>
+                          </div>
+                          <button 
+                            onClick={() => setParticipants(prev => prev.filter(item => item.id !== p.id))}
+                            className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="刪除"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -267,8 +336,44 @@ export default function App() {
                   </div>
                 </div>
                 
+                <div className="flex justify-center mb-4">
+                  <div className="bg-gray-100 p-1 rounded-xl flex gap-1">
+                    <button 
+                      onClick={() => { setDrawMode('individual'); setWinner(null); }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${drawMode === 'individual' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      個人抽籤
+                    </button>
+                    <button 
+                      onClick={() => { 
+                        setDrawMode('group'); 
+                        setWinner(null); 
+                        if (groups.length > 0 && !groups.find(g => g.id === selectedGroupId)) {
+                          setSelectedGroupId(groups[0].id);
+                        }
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${drawMode === 'group' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      分組抽籤
+                    </button>
+                  </div>
+                </div>
+
                 <h2 className="text-2xl font-bold mb-2">幸運大抽籤</h2>
-                <p className="text-gray-500 mb-8">點擊下方按鈕開始抽取幸運兒</p>
+                <div className="flex justify-center items-center gap-2 mb-8 text-gray-500">
+                  <span>點擊下方按鈕開始抽取幸運兒</span>
+                  {drawMode === 'group' && groups.length > 0 && (
+                    <select 
+                      value={selectedGroupId} 
+                      onChange={(e) => setSelectedGroupId(Number(e.target.value))}
+                      className="bg-white border border-gray-200 text-sm rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {groups.map(g => (
+                        <option key={g.id} value={g.id}>第 {g.id} 組</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
 
                 {/* Animation Area */}
                 <div className="h-32 flex items-center justify-center mb-8 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 overflow-hidden relative">
@@ -317,7 +422,7 @@ export default function App() {
 
                   <button 
                     onClick={startDraw}
-                    disabled={isDrawing || participants.length === 0}
+                    disabled={isDrawing || (drawMode === 'individual' ? participants.length === 0 : groups.length === 0)}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-3"
                   >
                     {isDrawing ? <RefreshCw className="animate-spin" /> : <Play fill="currentColor" />}
