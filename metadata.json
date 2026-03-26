@@ -1,0 +1,5 @@
+{
+  "name": "HR 抽籤與分組工具",
+  "description": "一個為 HR 設計的工具，支援 CSV 上傳與名單貼上，提供獎品抽籤動畫與自動分組功能。",
+  "requestFramePermissions": []
+}
